@@ -76,6 +76,19 @@ public class TcpSyslogMessageSender extends AbstractSyslogMessageSender {
      */
     protected final AtomicInteger trySendErrorCounter = new AtomicInteger();
 
+    /**
+     * Added delay for testing
+     */
+    private long addedDelayMs = 0;
+
+    public long getAddedDelayMs() {
+        return addedDelayMs;
+    }
+
+    public void setAddedDelayMs(long addedDelayMs) {
+        this.addedDelayMs = addedDelayMs;
+    }
+
     @Override
     public synchronized void sendMessage(@Nonnull SyslogMessage message) throws IOException {
         sendCounter.incrementAndGet();
@@ -89,7 +102,21 @@ public class TcpSyslogMessageSender extends AbstractSyslogMessageSender {
                         logger.finest("Send syslog message " + message.toSyslogMessage(messageFormat));
                     }
                     ensureSyslogServerConnection();
+                    if (message.getSeverity() == null) {
+                        message.setSeverity(defaultSeverity);
+                    }
+                    if (message.getFacility() == null) {
+                        message.setFacility(defaultFacility);
+                    }
                     message.toSyslogMessage(messageFormat, writer);
+                    // optional added delay for testing
+                    if (addedDelayMs > 0) {
+                        try {
+                            Thread.sleep(addedDelayMs);
+                        } catch (InterruptedException e) {
+                            break;
+                        }
+                    }
                     // use the CR LF non transparent framing as described in "3.4.2.  Non-Transparent-Framing"
                     writer.write("\r\n");
                     writer.flush();
@@ -238,6 +265,15 @@ public class TcpSyslogMessageSender extends AbstractSyslogMessageSender {
 
     public void setMaxRetryCount(int maxRetryCount) {
         this.maxRetryCount = maxRetryCount;
+    }
+
+    @Override
+    public synchronized void close() {
+        if (socket != null) {
+            IoUtils.closeQuietly(socket, writer);
+            socket = null;
+            writer = null;
+        }
     }
 
     @Override

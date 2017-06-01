@@ -17,6 +17,7 @@ package com.cloudbees.syslog.sender;
 
 import com.cloudbees.syslog.SyslogMessage;
 import com.cloudbees.syslog.util.CachingReference;
+import com.cloudbees.syslog.util.IoUtils;
 
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
@@ -28,6 +29,7 @@ import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.util.Objects;
 import java.util.logging.Level;
 
 /**
@@ -58,12 +60,7 @@ public class UdpSyslogMessageSender extends AbstractSyslogMessageSender {
     private DatagramSocket datagramSocket;
 
     public UdpSyslogMessageSender() {
-        try {
-            setSyslogServerHostname(DEFAULT_SYSLOG_HOST);
-            datagramSocket = new DatagramSocket();
-        } catch (IOException e) {
-            throw new IllegalStateException("Exception initializing datagramSocket", e);
-        }
+        setSyslogServerHostname(DEFAULT_SYSLOG_HOST);
     }
 
     /**
@@ -78,8 +75,15 @@ public class UdpSyslogMessageSender extends AbstractSyslogMessageSender {
         long nanosBefore = System.nanoTime();
 
         try {
+            ensureSyslogServerConnection();
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
             Writer out = new OutputStreamWriter(baos, UTF_8);
+            if (message.getSeverity() == null) {
+                message.setSeverity(defaultSeverity);
+            }
+            if (message.getFacility() == null) {
+                message.setFacility(defaultFacility);
+            }
             message.toSyslogMessage(messageFormat, out);
             out.flush();
 
@@ -98,6 +102,25 @@ public class UdpSyslogMessageSender extends AbstractSyslogMessageSender {
             throw e;
         } finally {
             sendDurationInNanosCounter.addAndGet(System.nanoTime() - nanosBefore);
+        }
+    }
+
+    private synchronized void ensureSyslogServerConnection() throws IOException {
+        boolean socketIsValid;
+        try {
+            socketIsValid = datagramSocket != null &&
+                    datagramSocket.isConnected()
+                    && datagramSocket.isBound()
+                    && !datagramSocket.isClosed();
+        } catch (Exception e) {
+            socketIsValid = false;
+        }
+        if (!socketIsValid) {
+            try {
+                datagramSocket = new DatagramSocket();
+            } catch (IOException e) {
+                throw new IllegalStateException("Exception initializing datagramSocket", e);
+            }
         }
     }
 
@@ -128,6 +151,14 @@ public class UdpSyslogMessageSender extends AbstractSyslogMessageSender {
 
     public int getSyslogServerPort() {
         return syslogServerPort;
+    }
+
+    @Override
+    public synchronized void close() {
+        if (datagramSocket != null) {
+            datagramSocket.close();
+            datagramSocket = null;
+        }
     }
 
     @Override
