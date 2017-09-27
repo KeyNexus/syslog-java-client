@@ -1,0 +1,38 @@
+language: java
+sudo: false
+
+before_script:
+  - cp $TRAVIS_BUILD_DIR/.travis.settings.xml ~/.m2/settings.xml 
+
+script:
+  - mvn test
+  - mvn package -DskipTests=true
+
+after_success:
+  - mvn deploy
+
+# Set up notification options
+notifications: 
+  email:
+    recipients:
+      - devops@keynexus.net
+
+    # change is when the repo status goes from pass to fail or vice versa
+    on_success: change
+    on_failure: always
+
+# declare your environment variables
+env:
+  # global will stay the same across all matrix possibilities (will not create additional combinations to run)
+  global: 
+    - KN_THEME=default
+    - KN_ENVIRONMENT=test
+    - CC_TEST_REPORTER_ID=45c807ce000072ac08ab5da26a869f6d79f31f640d437ff7850707c76e29c771
+    - ARTIFACTORY_ID=devops
+    - ARTIFACTORY_PASS=AP45L7y7Hrm69HLCrkTEbargquYT7i3cDKCUXv
+
+# configure which branches to run
+branches:
+  except:
+    - /^wip.*$/
+    - /^test.*/
