@@ -22,6 +22,7 @@
         <version>7</version>
     </parent>
 
+    <groupId>net.keynexus</groupId>
     <artifactId>syslog-java-client</artifactId>
     <packaging>jar</packaging>
     <version>1.0.9-CLOSEABLE</version>
